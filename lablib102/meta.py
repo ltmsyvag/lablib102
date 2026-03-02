@@ -3,7 +3,7 @@ from PIL import Image
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
-
+import pandas as pd
 
 class ArrayFrame:
     def __init__(self, path):
@@ -30,6 +30,7 @@ class ArrayFrame:
         self.total_pixel_mean = None
         self.pixel_means_by_rects = None
         self.std_of_rect_means = None
+        self.df = None
     def define_rects(self, x1, y1, x2, y2, x3, y3, nsites_x, nsites_y, rect_side, figsize = (6.4, 4.8), vmax = None, save_path = None):
         vecx = np.array([x2 - x1, y2 - y1])/(nsites_x-1)
         vecy = np.array([x3 - x1, y3 - y1])/(nsites_y-1)
@@ -72,6 +73,15 @@ class ArrayFrame:
     def _rects_check(self):
         if self.rects123 is None:
             raise ValueError("Please call define_rects first to define rects.")
+    def visialize_single_rect(self, ix, iy, vmax = None):
+        id1d = iy*self.n_sites_x + ix
+        x_low_edge, y_low_edge = self._low_edges[id1d]
+        block_slice = (slice(y_low_edge, y_low_edge+self.rect_side),
+                       slice(x_low_edge, x_low_edge+self.rect_side))
+        site_arr = self.imgarr[block_slice]
+        fig, ax = plt.subplots()
+        im = ax.imshow(site_arr, vmax=vmax)
+        fig.colorbar(im, ax=ax)
     def visualize_bmp(self, figsize=(6.4, 4.8), vmax=None, save_path=None):
         fig, ax = plt.subplots(figsize=figsize)
         extent = 0, self.imgarr.shape[1],  self.imgarr.shape[0], 0
