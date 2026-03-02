@@ -2,7 +2,7 @@
 from PIL import Image
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
+from matplotlib.patches import Rectangle, Circle
 import pandas as pd
 
 class ArrayFrame:
@@ -20,18 +20,16 @@ class ArrayFrame:
             3***********
         """
         self.rects123 = None, None, None, None, None, None
-        self.n_sites_x, self.n_sites_y = None, None
+        self.nsites_x, self.nsites_y = None, None
         self.rect_side = None
         self._low_edges = None
-        self.arr_sums = None
         self.df = None
         ## single stats
         self.rects_pixel_mean = None
         self.bg_pixel_mean = None
         self.total_pixel_mean = None
-        # self.pixel_means_by_rects = None
         self.std_of_rect_means = None
-        self.centroid_id = None # id_X, id_Y
+        self.centroid_site_id = None # id_X, id_Y
 
     def define_rects(self, x1, y1, x2, y2, x3, y3, nsites_x, nsites_y, rect_side, figsize = (6.4, 4.8), vmax = None, save_path = None):
         vecx = np.array([x2 - x1, y2 - y1])/(nsites_x-1)
@@ -58,37 +56,36 @@ class ArrayFrame:
 
 
         self.rects123 = np.round([x1, y1, x2, y2, x3, y3]).astype(int)
-        self.n_sites_x = nsites_x
-        self.n_sites_y = nsites_y
+        self.nsites_x = nsites_x
+        self.nsites_y = nsites_y
         self.rect_side = rect_side
         self._low_edges = low_edges
-        self.arr_sums = np.array(rect_sums).reshape(nsites_y, nsites_x)
+        arr_sums = np.array(rect_sums).reshape(nsites_y, nsites_x)
         self.total_mask = total_mask
         ## useful stats
         self.rects_pixel_mean = self.imgarr[total_mask].mean()
         self.bg_pixel_mean = self.imgarr[~total_mask].mean()
         self.total_pixel_mean = self.imgarr.mean()
-        pixel_means_by_rects = (self.arr_sums/(rect_side**2)).flatten()
+        pixel_means_by_rects = (arr_sums/(rect_side**2)).flatten()
         self.std_of_rect_means = pixel_means_by_rects.std()
         ## dataframe
-        lst_id2d = [(id1d//self.n_sites_x, id1d%self.n_sites_x) for id1d in range(self.n_sites_x*self.n_sites_y)]
+        lst_id2d = [(id1d//self.nsites_x, id1d%self.nsites_x) for id1d in range(self.nsites_x*self.nsites_y)]
         self.df = pd.DataFrame(lst_id2d, columns=['id_y', 'id_x'])
-        self.df['rect_sum'] = self.arr_sums.flatten()
+        self.df['rect_sum'] = arr_sums.flatten()
         self.df['rect_mean'] = pixel_means_by_rects
         self.df['rect_mean_normed'] = self.df['rect_mean']/self.rects_pixel_mean
-        # self.df['rect_sum_normed'] = self.df['rect_sum']/self.df['rect_sum'].max()
         self.df[['frame_coord_x', 'frame_coord_y']] = grid_points_int
         # derived data
-        self.centroid_id = ((self.df['id_x']*self.df['rect_sum']).sum()/self.df['rect_sum'].sum(), 
+        self.centroid_site_id = ((self.df['id_x']*self.df['rect_sum']).sum()/self.df['rect_sum'].sum(), 
                             (self.df['id_y']*self.df['rect_sum']).sum()/self.df['rect_sum'].sum())
-        
-        self.df['r_from_centroid'] = np.sqrt((self.df['id_x'] - self.centroid_id[0])**2 + (self.df['id_y'] - self.centroid_id[1])**2)
+        self.df['r_from_centroid'] = np.sqrt((self.df['id_x'] - self.centroid_site_id[0])**2 + (self.df['id_y'] - self.centroid_site_id[1])**2)
+
         self.visualize_rects(figsize=figsize, vmax=vmax, save_path=save_path)
     def _rects_check(self):
         if self.rects123 is None:
             raise ValueError("Please call define_rects first to define rects.")
-    def visialize_single_rect(self, ix, iy, vmax = None):
-        id1d = iy*self.n_sites_x + ix
+    def visualize_single_rect(self, ix, iy, vmax = None):
+        id1d = iy*self.nsites_x + ix
         x_low_edge, y_low_edge = self._low_edges[id1d]
         block_slice = (slice(y_low_edge, y_low_edge+self.rect_side),
                        slice(x_low_edge, x_low_edge+self.rect_side))
@@ -96,7 +93,7 @@ class ArrayFrame:
         fig, ax = plt.subplots()
         im = ax.imshow(site_arr, vmax=vmax)
         fig.colorbar(im, ax=ax)
-    def visualize_bmp(self, figsize=(6.4, 4.8), vmax=None, save_path=None):
+    def show_bmp(self, figsize=(6.4, 4.8), vmax=None, save_path=None):
         fig, ax = plt.subplots(figsize=figsize)
         extent = 0, self.imgarr.shape[1],  self.imgarr.shape[0], 0
         ax.imshow(self.imgarr, extent=extent, vmax=vmax)
@@ -116,7 +113,8 @@ class ArrayFrame:
     def visualize_site_homogeneity(self):
         self._rects_check()
         fig, ax = plt.subplots()
-        im = ax.imshow(self.arr_sums/self.arr_sums.max())
+        im = ax.imshow(self.df['rect_mean_normed'].values.reshape(self.nsites_y, self.nsites_x))
+        ax.add_patch(Circle(self.centroid_site_id, radius=2, color='white', fill = False))
         fig.colorbar(im, ax=ax)
     def rects_hist(self):
         self._rects_check()
