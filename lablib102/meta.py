@@ -1,0 +1,116 @@
+#%%
+from PIL import Image
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
+
+
+class ArrayFrame:
+    def __init__(self, path):
+        self.path = path
+        assert path.endswith('.bmp'), "Only .bmp files are supported"
+        self.imgarr = np.array(Image.open(path))
+        self.total_mask = None
+        
+        """
+            三个点的位置:
+               1**********2
+              ************
+             ************
+            3***********
+        """
+        self.rects123 = None, None, None, None, None, None
+        self.n_sites_x, self.n_sites_y = None, None
+        self.rect_side = None
+        self._low_edges = None
+        self.arr_sums = None
+        ## stats
+        self.rects_pixel_mean = None
+        self.bg_pixel_mean = None
+        self.total_pixel_mean = None
+        self.pixel_means_by_rects = None
+        self.std_of_rect_means = None
+    def define_rects(self, x1, y1, x2, y2, x3, y3, nsites_x, nsites_y, rect_side, figsize = (6.4, 4.8), vmax = None, save_path = None):
+        vecx = np.array([x2 - x1, y2 - y1])/(nsites_x-1)
+        vecy = np.array([x3 - x1, y3 - y1])/(nsites_y-1)
+        grid_points_float = np.array([np.array([x1, y1]) + nx*vecx + ny*vecy 
+                        for ny in range(nsites_y)
+                        for nx in range(nsites_x)
+                        ])
+        grid_points_int = np.round(grid_points_float).astype(int)
+        rect_side = round(rect_side)
+        rect_sums = []
+        low_edges = []
+        total_mask = np.zeros(self.imgarr.shape, dtype=bool)
+        for x, y in grid_points_int:
+            x_low_edge = x - (rect_side - 1) // 2 # 保证 rect_side == 1 时, grid point 对应 rect 左上角
+            y_low_edge = y - (rect_side - 1) // 2
+            low_edges.append((x_low_edge, y_low_edge))
+            this_block_slice = (slice(y_low_edge, y_low_edge+rect_side), 
+                           slice(x_low_edge, x_low_edge+rect_side))
+            
+            total_mask[this_block_slice] = True
+            this_rect_sum = self.imgarr[this_block_slice].sum()
+            rect_sums.append(this_rect_sum)
+
+
+        self.rects123 = x1, y1, x2, y2, x3, y3
+        self.n_sites_x = nsites_x
+        self.n_sites_y = nsites_y
+        self.rect_side = rect_side
+        self._low_edges = low_edges
+        self.arr_sums = np.array(rect_sums).reshape(nsites_y, nsites_x)
+        self.total_mask = total_mask
+        ## useful stats
+        self.rects_pixel_mean = self.imgarr[total_mask].mean()
+        self.bg_pixel_mean = self.imgarr[~total_mask].mean()
+        self.total_pixel_mean = self.imgarr.mean()
+        self.pixel_means_by_rects = (self.arr_sums/(rect_side**2)).flatten()
+        self.std_of_rect_means = self.pixel_means_by_rects.std()
+
+        self.visualize_rects(figsize=figsize, vmax=vmax, save_path=save_path)
+    def _rects_check(self):
+        if self.rects123 is None:
+            raise ValueError("Please call define_rects first to define rects.")
+    def visualize_bmp(self, figsize=(6.4, 4.8), vmax=None, save_path=None):
+        fig, ax = plt.subplots(figsize=figsize)
+        extent = 0, self.imgarr.shape[1],  self.imgarr.shape[0], 0
+        ax.imshow(self.imgarr, extent=extent, vmax=vmax)
+        if save_path is not None:
+            fig.savefig(save_path, dpi=600)
+    def visualize_rects(self, figsize = (6.4, 4.8), vmax = None, save_path = None):
+        self._rects_check()
+        fig, ax = plt.subplots(figsize = figsize)
+        extent = 0, self.imgarr.shape[1],  self.imgarr.shape[0], 0
+        ax.imshow(self.imgarr, extent=extent, vmax = vmax)
+        for x_low_edge, y_low_edge in self._low_edges:
+            ax.add_patch(Rectangle((x_low_edge, y_low_edge),
+                                self.rect_side, self.rect_side, 
+                                fill=False, edgecolor='red', linewidth=0.5))
+        if save_path is not None:
+            fig.savefig(save_path, dpi=600)
+    def visualize_site_homogeneity(self):
+        fig, ax = plt.subplots()
+        im = ax.imshow(self.arr_sums/self.arr_sums.max())
+        fig.colorbar(im, ax=ax)
+    def rects_hist(self):
+        fig, ax = plt.subplots()
+        ax.hist(self.pixel_means_by_rects, bins=30, label = 'single ROI pixel mean')
+        ax.axvline(self.total_pixel_mean, color='red', linestyle='dashed', label='total Pixel Mean')
+        ax.axvline(self.rects_pixel_mean, color='k', linestyle='dashed', label='Pixel Mean of all ROIs')
+        ax.axvline(self.bg_pixel_mean, color='blue', linestyle='dashed', label='Pixel Mean of bg (ROI subtracted)')
+        ax.errorbar(self.rects_pixel_mean, 100, xerr=self.std_of_rect_means,
+                    fmt='o', color='black', capsize=20, label = f'hist std = {self.std_of_rect_means/self.rects_pixel_mean:.2f}$\\times$"pixel mean of all ROIs"')
+        ax.set_xlabel('val per pixel')
+        ax.set_ylabel('Counts')
+        ax.legend(loc = (1,0))
+if __name__ == "__main__":
+    myframe = ArrayFrame('sample1.bmp')
+    myframe.define_rects(
+        x1=222, y1=35, x2=1170, y2=32.05, x3=222, y3=982,
+        nsites_x=50, nsites_y=50, rect_side=13,
+        figsize = (13, 13), vmax=100)
+    myframe.visualize_site_homogeneity()
+    myframe.visualize_bmp(figsize=(13,13), vmax=100)
+    myframe.rects_hist()
+# myframe.visualize_rects(figsize=(13,13), vmax=100)   
