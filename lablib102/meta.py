@@ -24,13 +24,15 @@ class ArrayFrame:
         self.rect_side = None
         self._low_edges = None
         self.arr_sums = None
-        ## stats
+        self.df = None
+        ## single stats
         self.rects_pixel_mean = None
         self.bg_pixel_mean = None
         self.total_pixel_mean = None
-        self.pixel_means_by_rects = None
+        # self.pixel_means_by_rects = None
         self.std_of_rect_means = None
-        self.df = None
+        self.centroid_id = None # id_X, id_Y
+
     def define_rects(self, x1, y1, x2, y2, x3, y3, nsites_x, nsites_y, rect_side, figsize = (6.4, 4.8), vmax = None, save_path = None):
         vecx = np.array([x2 - x1, y2 - y1])/(nsites_x-1)
         vecy = np.array([x3 - x1, y3 - y1])/(nsites_y-1)
@@ -66,9 +68,21 @@ class ArrayFrame:
         self.rects_pixel_mean = self.imgarr[total_mask].mean()
         self.bg_pixel_mean = self.imgarr[~total_mask].mean()
         self.total_pixel_mean = self.imgarr.mean()
-        self.pixel_means_by_rects = (self.arr_sums/(rect_side**2)).flatten()
-        self.std_of_rect_means = self.pixel_means_by_rects.std()
-
+        pixel_means_by_rects = (self.arr_sums/(rect_side**2)).flatten()
+        self.std_of_rect_means = pixel_means_by_rects.std()
+        ## dataframe
+        lst_id2d = [(id1d//self.n_sites_x, id1d%self.n_sites_x) for id1d in range(self.n_sites_x*self.n_sites_y)]
+        self.df = pd.DataFrame(lst_id2d, columns=['id_y', 'id_x'])
+        self.df['rect_sum'] = self.arr_sums.flatten()
+        self.df['rect_mean'] = pixel_means_by_rects
+        self.df['rect_mean_normed'] = self.df['rect_mean']/self.rects_pixel_mean
+        # self.df['rect_sum_normed'] = self.df['rect_sum']/self.df['rect_sum'].max()
+        self.df[['frame_coord_x', 'frame_coord_y']] = grid_points_int
+        # derived data
+        self.centroid_id = ((self.df['id_x']*self.df['rect_sum']).sum()/self.df['rect_sum'].sum(), 
+                            (self.df['id_y']*self.df['rect_sum']).sum()/self.df['rect_sum'].sum())
+        
+        self.df['r_to_centroid'] = np.sqrt((self.df['id_x'] - self.centroid_id[0])**2 + (self.df['id_y'] - self.centroid_id[1])**2)
         self.visualize_rects(figsize=figsize, vmax=vmax, save_path=save_path)
     def _rects_check(self):
         if self.rects123 is None:
@@ -104,10 +118,10 @@ class ArrayFrame:
         fig, ax = plt.subplots()
         im = ax.imshow(self.arr_sums/self.arr_sums.max())
         fig.colorbar(im, ax=ax)
-        self._rects_check()
     def rects_hist(self):
+        self._rects_check()
         fig, ax = plt.subplots()
-        ax.hist(self.pixel_means_by_rects/self.rects_pixel_mean, bins=30, label = 'single ROI pixel mean')
+        ax.hist(self.df['rect_mean']/self.rects_pixel_mean, bins=30, label = 'single ROI pixel mean')
         ax.axvline(self.total_pixel_mean/self.rects_pixel_mean, color='red', linestyle='dashed', label='total Pixel Mean')
         ax.axvline(self.rects_pixel_mean/self.rects_pixel_mean, color='k', linestyle='dashed', label='Pixel Mean of all ROIs')
         ax.axvline(self.bg_pixel_mean/self.rects_pixel_mean, color='blue', linestyle='dashed', label='Pixel Mean of bg (ROI subtracted)')
