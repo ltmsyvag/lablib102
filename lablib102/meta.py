@@ -82,7 +82,7 @@ class ArrayFrame:
         self.centroid_id = ((self.df['id_x']*self.df['rect_sum']).sum()/self.df['rect_sum'].sum(), 
                             (self.df['id_y']*self.df['rect_sum']).sum()/self.df['rect_sum'].sum())
         
-        self.df['r_to_centroid'] = np.sqrt((self.df['id_x'] - self.centroid_id[0])**2 + (self.df['id_y'] - self.centroid_id[1])**2)
+        self.df['r_from_centroid'] = np.sqrt((self.df['id_x'] - self.centroid_id[0])**2 + (self.df['id_y'] - self.centroid_id[1])**2)
         self.visualize_rects(figsize=figsize, vmax=vmax, save_path=save_path)
     def _rects_check(self):
         if self.rects123 is None:
