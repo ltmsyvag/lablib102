@@ -54,7 +54,7 @@ class ArrayFrame:
             rect_sums.append(this_rect_sum)
 
 
-        self.rects123 = x1, y1, x2, y2, x3, y3
+        self.rects123 = np.round([x1, y1, x2, y2, x3, y3]).astype(int)
         self.n_sites_x = nsites_x
         self.n_sites_y = nsites_y
         self.rect_side = rect_side
@@ -90,27 +90,19 @@ class ArrayFrame:
         if save_path is not None:
             fig.savefig(save_path, dpi=600)
     def visualize_site_homogeneity(self):
+        self._rects_check()
         fig, ax = plt.subplots()
         im = ax.imshow(self.arr_sums/self.arr_sums.max())
         fig.colorbar(im, ax=ax)
+        self._rects_check()
     def rects_hist(self):
         fig, ax = plt.subplots()
-        ax.hist(self.pixel_means_by_rects, bins=30, label = 'single ROI pixel mean')
-        ax.axvline(self.total_pixel_mean, color='red', linestyle='dashed', label='total Pixel Mean')
-        ax.axvline(self.rects_pixel_mean, color='k', linestyle='dashed', label='Pixel Mean of all ROIs')
-        ax.axvline(self.bg_pixel_mean, color='blue', linestyle='dashed', label='Pixel Mean of bg (ROI subtracted)')
-        ax.errorbar(self.rects_pixel_mean, 100, xerr=self.std_of_rect_means,
-                    fmt='o', color='black', capsize=20, label = f'hist std = {self.std_of_rect_means/self.rects_pixel_mean:.2f}$\\times$"pixel mean of all ROIs"')
+        ax.hist(self.pixel_means_by_rects/self.rects_pixel_mean, bins=30, label = 'single ROI pixel mean')
+        ax.axvline(self.total_pixel_mean/self.rects_pixel_mean, color='red', linestyle='dashed', label='total Pixel Mean')
+        ax.axvline(self.rects_pixel_mean/self.rects_pixel_mean, color='k', linestyle='dashed', label='Pixel Mean of all ROIs')
+        ax.axvline(self.bg_pixel_mean/self.rects_pixel_mean, color='blue', linestyle='dashed', label='Pixel Mean of bg (ROI subtracted)')
+        ax.errorbar(1, 100, xerr=self.std_of_rect_means/self.rects_pixel_mean,
+                    fmt='o', color='black', capsize=20, label = f'hist std = {self.std_of_rect_means/self.rects_pixel_mean:.2f}')
         ax.set_xlabel('val per pixel')
         ax.set_ylabel('Counts')
         ax.legend(loc = (1,0))
-if __name__ == "__main__":
-    myframe = ArrayFrame('sample1.bmp')
-    myframe.define_rects(
-        x1=222, y1=35, x2=1170, y2=32.05, x3=222, y3=982,
-        nsites_x=50, nsites_y=50, rect_side=13,
-        figsize = (13, 13), vmax=100)
-    myframe.visualize_site_homogeneity()
-    myframe.visualize_bmp(figsize=(13,13), vmax=100)
-    myframe.rects_hist()
-# myframe.visualize_rects(figsize=(13,13), vmax=100)   
