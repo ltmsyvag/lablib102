@@ -103,6 +103,6 @@ class ArrayFrame:
         ax.axvline(self.bg_pixel_mean/self.rects_pixel_mean, color='blue', linestyle='dashed', label='Pixel Mean of bg (ROI subtracted)')
         ax.errorbar(1, 100, xerr=self.std_of_rect_means/self.rects_pixel_mean,
                     fmt='o', color='black', capsize=20, label = f'hist std = {self.std_of_rect_means/self.rects_pixel_mean:.2f}')
-        ax.set_xlabel('val per pixel')
-        ax.set_ylabel('Counts')
+        ax.set_xlabel('relative mean intensity per pixel')
+        ax.set_ylabel('frequency')
         ax.legend(loc = (1,0))
