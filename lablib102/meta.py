@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle, Circle
 import pandas as pd
+from scipy import ndimage
 
 class ArrayFrame:
     def __init__(self, path):
@@ -68,6 +69,8 @@ class ArrayFrame:
         self.total_pixel_mean = self.imgarr.mean()
         pixel_means_by_rects = (arr_sums/(rect_side**2)).flatten()
         self.std_of_rect_means = pixel_means_by_rects.std()
+        y0, x0 = ndimage.center_of_mass(arr_sums)
+        self.centroid_site_id = x0, y0
         ## dataframe
         lst_id2d = [(id1d//self.nsites_x, id1d%self.nsites_x) for id1d in range(self.nsites_x*self.nsites_y)]
         self.df = pd.DataFrame(lst_id2d, columns=['id_y', 'id_x'])
@@ -76,9 +79,7 @@ class ArrayFrame:
         self.df['rect_mean_normed'] = self.df['rect_mean']/self.rects_pixel_mean
         self.df[['frame_coord_x', 'frame_coord_y']] = grid_points_int
         # derived data
-        self.centroid_site_id = ((self.df['id_x']*self.df['rect_sum']).sum()/self.df['rect_sum'].sum(), 
-                            (self.df['id_y']*self.df['rect_sum']).sum()/self.df['rect_sum'].sum())
-        self.df['r_from_centroid'] = np.sqrt((self.df['id_x'] - self.centroid_site_id[0])**2 + (self.df['id_y'] - self.centroid_site_id[1])**2)
+        self.df['r_from_centroid'] = np.sqrt((self.df['id_x'] - x0)**2 + (self.df['id_y'] - y0)**2)
 
         self.visualize_rects(figsize=figsize, vmax=vmax, save_path=save_path)
     def _rects_check(self):
