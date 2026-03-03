@@ -5,14 +5,12 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle, Circle
 import pandas as pd
 from scipy import ndimage
-
+from .gaussian2d import gaussian_2d, initial_guess_gaussian2d
+from scipy.optimize import curve_fit
 class ArrayFrame:
     def __init__(self, path):
         self.path = path
-        assert path.endswith('.bmp'), "Only .bmp files are supported"
-        self.imgarr = np.array(Image.open(path))
-        self.total_mask = None
-        
+        self.imgarr = np.array(Image.open(path).convert('L'))
         """
             三个点的位置:
                1**********2
@@ -20,6 +18,7 @@ class ArrayFrame:
              ************
             3***********
         """
+        self.total_mask = None
         self.rects123 = None, None, None, None, None, None
         self.nsites_x, self.nsites_y = None, None
         self.rect_side = None
@@ -31,8 +30,14 @@ class ArrayFrame:
         self.total_pixel_mean = None
         self.std_of_rect_means = None
         self.centroid_of_sites = None # id_X, id_Y
-
-    def define_rects(self, x1, y1, x2, y2, x3, y3, nsites_x, nsites_y, rect_side, figsize = (6.4, 4.8), vmax = None, save_path = None):
+        # misc
+        self.percentile_thrown = 50 # 找质心时丢掉的背景, 以及拟合 2d 高斯时的背景 initial guess
+        self._arr_rect_mean_normed = None
+        self.popt = None # A, x0, y0, sxsq_plus_sysq, bg
+    def define_rects(self, x1, y1, x2, y2, x3, y3, 
+                     nsites_x, nsites_y, rect_side, 
+                     figsize = (6.4, 4.8), vmax = None, save_path = None,
+                     fit_gaussian = True):
         vecx = np.array([x2 - x1, y2 - y1])/(nsites_x-1)
         vecy = np.array([x3 - x1, y3 - y1])/(nsites_y-1)
         grid_points_float = np.array([np.array([x1, y1]) + nx*vecx + ny*vecy 
@@ -79,23 +84,49 @@ class ArrayFrame:
         
         ## centroid
         x0, y0 = self.get_site_centroid(arr_sums)
-        self._update_centroid_and_r(x0, y0)
+        self._update_radial_distance(x0, y0, 'r_from_centroid')
+
+        ## 2d gaussian fit
+        self.popt = None
+        self._arr_rect_mean_normed = self.df['rect_mean_normed'].values.reshape(self.nsites_y, self.nsites_x)
+        if fit_gaussian:
+            yy, xx = np.indices(self._arr_rect_mean_normed.shape)
+            self.popt, _ = curve_fit(gaussian_2d,
+                                (xx, yy), 
+                                self._arr_rect_mean_normed.ravel(),
+                                p0 = initial_guess_gaussian2d(
+                                    self._arr_rect_mean_normed, 
+                                    percentile_thrown=self.percentile_thrown)
+                                )
+            _, x0, y0, _, _ = self.popt
+            self._update_radial_distance(x0, y0, 'r_from_gaussian_peak')
 
         self.visualize_rects(figsize=figsize, vmax=vmax, save_path=save_path)
-    def _update_centroid_and_r(self, x0, y0):
-        self.centroid_of_sites = x0, y0
-        self.df['r_from_centroid'] = np.sqrt(
+    def visualize_gaussian_fit(self):
+        if self.popt is not None:
+            data_shape = self._arr_rect_mean_normed.shape
+            yy, xx = np.indices(data_shape)
+            zz_fit = gaussian_2d((xx, yy), *self.popt)
+            zz_fit = zz_fit.reshape(data_shape)
+            fig, ax = plt.subplots()
+            im = ax.imshow(zz_fit)
+            fig.colorbar(im, ax = ax)
+        else:
+            raise ValueError('no fit stored!')
+    def _update_radial_distance(self, x0, y0, col):
+        # self.centroid_of_sites = x0, y0
+        self.df[col] = np.sqrt(
             (self.df['id_x'] - x0)**2
             + (self.df['id_y'] - y0)**2)
-    def set_centroid_of_sites(self, x0, y0):
+    def set_manual_origin(self, x0, y0):
         self._has_rects()
-        self._update_centroid_and_r(x0, y0)
-    @staticmethod
-    def get_site_centroid(zz: np.ndarray):
-        bbgg = np.percentile(zz,50) # bg substraction, kinda important
+        self._update_radial_distance(x0, y0, 'r_from_manual_origin')
+    def get_site_centroid(self, zz: np.ndarray):
+        bbgg = np.percentile(zz, self.percentile_thrown) # bg substraction, kinda important
         zz_shifted = zz-bbgg
         zz_shifted[zz_shifted < 0] = 0
         y0, x0 = ndimage.center_of_mass(zz_shifted)
+        self.centroid_of_sites = x0, y0
         return x0, y0
     def _has_rects(self):
         if self.rects123 is None:
@@ -130,9 +161,24 @@ class ArrayFrame:
     def visualize_site_homogeneity(self):
         self._has_rects()
         fig, ax = plt.subplots()
-        im = ax.imshow(self.df['rect_mean_normed'].values.reshape(self.nsites_y, self.nsites_x))
-        ax.add_patch(Circle(self.centroid_of_sites, radius=2, color='white', fill = False))
+        im = ax.imshow(self._arr_rect_mean_normed)
+        ax.add_patch(Circle(
+            self.centroid_of_sites, radius=2, color='black', fill = False,
+            label = 'centroid of sites'))
+        if self.popt is not None:
+            A, x0, y0, sxsq_plus_sysq, bg = self.popt
+            ax.add_patch(
+                Circle(
+                (x0, y0), radius = 2, 
+                color = 'red', fill = False, ls = ':',
+                  label = 'gaussian peak'))
+            ax.add_patch(
+                Circle(
+                (x0, y0), radius = np.sqrt(2*sxsq_plus_sysq)/2, 
+                color = 'blue', fill = False,
+                  label = 'D4sigma/10'))
         fig.colorbar(im, ax=ax)
+        ax.legend(loc = (0, 1))
     def rects_hist(self):
         self._has_rects()
         fig, ax = plt.subplots()
