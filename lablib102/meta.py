@@ -108,9 +108,25 @@ class ArrayFrame:
             yy, xx = np.indices(data_shape)
             zz_fit = gaussian_2d_iso((xx, yy), *self.popt)
             zz_fit = zz_fit.reshape(data_shape)
-            fig, ax = plt.subplots()
-            im = ax.imshow(zz_fit)
-            fig.colorbar(im, ax = ax)
+            fig = plt.figure(figsize = (12,6))
+            ax1 = fig.add_subplot(1,2,1)
+            ax2 = fig.add_subplot(1,2,2, projection='3d')
+            im = ax1.contourf(zz_fit)
+            ax1.set_aspect(self.nsites_y/self.nsites_x)
+            fig.colorbar(im, ax = ax1)
+            ax1.set_xlabel('x')
+            ax1.set_ylabel('y')
+            ax1.set_title('gaussian fit')
+            yy, xx = np.indices(zz_fit.shape)
+            ax2.plot_wireframe(xx, yy, zz_fit, color = 'k',
+                               rstride = 2, cstride = 2,
+                                label = 'gaussian fit', alpha = 1)
+            ax2.plot_surface(xx, yy, self._arr_rect_mean_normed, cmap = 'jet',
+                               alpha=0.3, label = 'data')
+            ax2.set_xlabel('x')
+            ax2.set_ylabel('y')
+            # ax2.view_init(elev=-30)
+            ax2.legend()
         else:
             raise ValueError('no fit stored!')
     def _update_radial_distance(self, x0, y0, col):
