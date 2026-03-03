@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle, Circle
 import pandas as pd
 from scipy import ndimage
-from .gaussian2d import gaussian_2d, initial_guess_gaussian2d
+from .gaussian2d import gaussian_2d_iso, initial_guess_gaussian2d
 from scipy.optimize import curve_fit
 class ArrayFrame:
     def __init__(self, path):
@@ -91,7 +91,7 @@ class ArrayFrame:
         self._arr_rect_mean_normed = self.df['rect_mean_normed'].values.reshape(self.nsites_y, self.nsites_x)
         if fit_gaussian:
             yy, xx = np.indices(self._arr_rect_mean_normed.shape)
-            self.popt, _ = curve_fit(gaussian_2d,
+            self.popt, _ = curve_fit(gaussian_2d_iso,
                                 (xx, yy), 
                                 self._arr_rect_mean_normed.ravel(),
                                 p0 = initial_guess_gaussian2d(
@@ -106,7 +106,7 @@ class ArrayFrame:
         if self.popt is not None:
             data_shape = self._arr_rect_mean_normed.shape
             yy, xx = np.indices(data_shape)
-            zz_fit = gaussian_2d((xx, yy), *self.popt)
+            zz_fit = gaussian_2d_iso((xx, yy), *self.popt)
             zz_fit = zz_fit.reshape(data_shape)
             fig, ax = plt.subplots()
             im = ax.imshow(zz_fit)

@@ -1,8 +1,8 @@
 #%%
 import numpy as np
 from scipy import ndimage
-# ---- 2D Gaussian model ----
-def gaussian_2d(xxyy_coords, A, x0, y0, sxsq_plus_sysq, bbgg):
+
+def gaussian_2d_iso(xxyy_coords, A, x0, y0, sxsq_plus_sysq, bbgg):
     xx, yy = xxyy_coords
     g = A * np.exp(-(
         (xx - x0)**2 +
@@ -35,7 +35,7 @@ if __name__ == '__main__':
     xx, yy = np.meshgrid(x, y)
 
     true_params = (5, 20, 25, 50, 0.5)  # A, x0, y0, sxy, bg
-    zz = gaussian_2d((xx, yy), *true_params).reshape(ny, nx)
+    zz = gaussian_2d_iso((xx, yy), *true_params).reshape(ny, nx)
 
     # add noise
     zz_noisy = zz + 0.3 * np.random.normal(size=zz.shape)
@@ -47,9 +47,9 @@ if __name__ == '__main__':
     ax.imshow(zz_noisy)
 
     yy, xx = np.indices(zz_noisy.shape)
-    popt, _ = curve_fit(gaussian_2d, (xx, yy), zz_noisy.ravel(), p0=initial_guess_gaussian2d(zz_noisy))
+    popt, _ = curve_fit(gaussian_2d_iso, (xx, yy), zz_noisy.ravel(), p0=initial_guess_gaussian2d(zz_noisy))
 
-    zz_fit = gaussian_2d((xx,yy), *popt)
+    zz_fit = gaussian_2d_iso((xx,yy), *popt)
     zz_fit = zz_fit.reshape(zz_noisy.shape)
     fig, ax = plt.subplots()
     ax.imshow(zz_fit)

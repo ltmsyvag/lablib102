@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from arc import Rubidium85
 from p_tqdm import p_map
-from helper import velo_dist_discretization
+from archive.helper import velo_dist_discretization
 from functools import partial
 
 
