@@ -174,7 +174,7 @@ class ArrayFrame:
                   label = 'gaussian peak'))
             ax.add_patch(
                 Circle(
-                (x0, y0), radius = np.sqrt(2*sxsq_plus_sysq)/2, 
+                (x0, y0), radius = np.sqrt(2*sxsq_plus_sysq)/10, 
                 color = 'blue', fill = False,
                   label = 'D4sigma/10'))
         fig.colorbar(im, ax=ax)

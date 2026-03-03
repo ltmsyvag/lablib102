@@ -4,6 +4,8 @@ __pycache__/
 *.bmp
 *.png
 *.pdf
+*.tif
+*.tiff
 build/
 dist/
 *.egg-info/
