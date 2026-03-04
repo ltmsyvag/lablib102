@@ -1,16 +1,13 @@
 [build-system]
-requires = ["setuptools>=64", "wheel", "setuptools_scm[toml]>=8"]
+requires = ["setuptools", "wheel", "setuptools_scm[toml]"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["lablib102"] # 确保只有 lablib102 一个包(folder)会被 pip 安装. repo/ 下的其他 folder 都会被忽略
 
-[tool.setuptools_scm]
-version_scheme = "guess-next_dev"
-local_scheme = "node-and-date"
-
 [project]
 name = "lablib102" # pip 安装后显示的真实 name
+dynamic = ["version"]
 # version = "0.3.2" # pip 安装后显示的真实版本号
 description = "personal library for my lab"
 authors = [{ name = "haiteng" }]
