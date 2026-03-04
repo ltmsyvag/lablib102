@@ -1,13 +1,9 @@
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=80", "setuptools-scm[simple]>=9.2"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools.packages.find]
-include = ["lablib102"] # 确保只有 lablib102 一个包(folder)会被 pip 安装. repo/ 下的其他 folder 都会被忽略
-
 [project]
-name = "lablib102" # pip 安装后显示的真实 name
-version = "0.3.3" # pip 安装后显示的真实版本号
-description = "personal library for my lab"
-authors = [{ name = "haiteng" }]
-dependencies = []
+name = "lablib102"
+# Important: Remove any existing version declaration
+# version = "0.0.1"
+dynamic = ["version"]
