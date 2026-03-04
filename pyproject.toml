@@ -1,3 +1,4 @@
+# 用 git-hash 做 versioning 的 toml 设置, 见 https://setuptools-scm.readthedocs.io/en/latest/
 [build-system]
 requires = ["setuptools>=80", "setuptools-scm[simple]>=9.2"]
 build-backend = "setuptools.build_meta"
@@ -9,4 +10,6 @@ include = ["lablib102"] # 确保只有 lablib102 一个包(folder)会被 pip 安
 name = "lablib102"
 # Important: Remove any existing version declaration
 # version = "0.0.1"
+description = "personal library for my lab"
+authors = [{ name = "haiteng" }]
 dynamic = ["version"]
