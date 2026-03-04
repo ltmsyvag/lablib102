@@ -8,7 +8,7 @@ include = ["lablib102"] # 确保只有 lablib102 一个包(folder)会被 pip 安
 [project]
 name = "lablib102" # pip 安装后显示的真实 name
 dynamic = ["version"]
-# version = "0.3.2" # pip 安装后显示的真实版本号
+version = "0.3.3" # pip 安装后显示的真实版本号
 description = "personal library for my lab"
 authors = [{ name = "haiteng" }]
 dependencies = []
