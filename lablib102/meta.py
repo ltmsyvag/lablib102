@@ -7,6 +7,7 @@ import pandas as pd
 from scipy import ndimage
 from .gaussian2d import gaussian_2d_iso, initial_guess_gaussian2d
 from scipy.optimize import curve_fit
+import lablib102
 class ArrayFrame:
     def __init__(self, path):
         self.path = path
@@ -176,7 +177,7 @@ class ArrayFrame:
                                 self.rect_side, self.rect_side, 
                                 fill=False, edgecolor='red', linewidth=0.5))
         x1, y1, x2, y2, x3, y3 = self.rects123
-        ax.set_title(f'x1 {x1}, y1 {y1}, x2 {x2}, y2 {y2}, x3 {x3}, y3 {y3}, nx/ny {self.nsites_x}/{self.nsites_y}, rect_side {self.rect_side}')
+        ax.set_title(f'x1 {x1}, y1 {y1}, x2 {x2}, y2 {y2}, x3 {x3}, y3 {y3}, nx/ny {self.nsites_x}/{self.nsites_y}, rect_side {self.rect_side}\n{lablib102.__version__}',)
         if save_path is not None:
             fig.savefig(save_path, dpi=600)
     def visualize_site_homogeneity(self):
