@@ -37,7 +37,7 @@ class ArrayFrame:
     def define_rects(self, x1, y1, x2, y2, x3, y3, 
                      nsites_x, nsites_y, rect_side, 
                      figsize = (6.4, 4.8), vmax = None, save_path = None,
-                     fit_gaussian = True):
+                     fit_gaussian = False):
         vecx = np.array([x2 - x1, y2 - y1])/(nsites_x-1)
         vecy = np.array([x3 - x1, y3 - y1])/(nsites_y-1)
         grid_points_float = np.array([np.array([x1, y1]) + nx*vecx + ny*vecy 
@@ -114,8 +114,10 @@ class ArrayFrame:
             im = ax1.contourf(zz_fit)
             ax1.set_aspect(self.nsites_y/self.nsites_x)
             fig.colorbar(im, ax = ax1)
+            fig.suptitle(f'A, x0, y0, sxsq_plus_sysq, bg = {self.popt}')
             ax1.set_xlabel('x')
             ax1.set_ylabel('y')
+            ax1.invert_yaxis()
             ax1.set_title('gaussian fit')
             yy, xx = np.indices(zz_fit.shape)
             ax2.plot_wireframe(xx, yy, zz_fit, color = 'k',
@@ -125,7 +127,7 @@ class ArrayFrame:
                                alpha=0.3, label = 'data')
             ax2.set_xlabel('x')
             ax2.set_ylabel('y')
-            # ax2.view_init(elev=-30)
+            ax2.invert_yaxis()
             ax2.legend()
         else:
             raise ValueError('no fit stored!')
@@ -156,6 +158,7 @@ class ArrayFrame:
         site_arr = self.imgarr[block_slice]
         fig, ax = plt.subplots()
         im = ax.imshow(site_arr, vmax=vmax)
+        ax.set_title(f'site {ix, iy}')
         fig.colorbar(im, ax=ax)
     def show_bmp(self, figsize=(6.4, 4.8), vmax=None, save_path=None):
         fig, ax = plt.subplots(figsize=figsize)
@@ -172,6 +175,8 @@ class ArrayFrame:
             ax.add_patch(Rectangle((x_low_edge, y_low_edge),
                                 self.rect_side, self.rect_side, 
                                 fill=False, edgecolor='red', linewidth=0.5))
+        x1, y1, x2, y2, x3, y3 = self.rects123
+        ax.set_title(f'x1 {x1}, y1 {y1}, x2 {x2}, y2 {y2}, x3 {x3}, y3 {y3}, nx/ny {self.nsites_x}/{self.nsites_y}, rect_side {self.rect_side}')
         if save_path is not None:
             fig.savefig(save_path, dpi=600)
     def visualize_site_homogeneity(self):
@@ -188,11 +193,12 @@ class ArrayFrame:
                 (x0, y0), radius = 2, 
                 color = 'red', fill = False, ls = ':',
                   label = 'gaussian peak'))
-            ax.add_patch(
-                Circle(
-                (x0, y0), radius = np.sqrt(2*sxsq_plus_sysq)/10, 
-                color = 'blue', fill = False,
-                  label = 'D4sigma/10'))
+            # ax.add_patch(
+            #     Circle(
+            #     (x0, y0), radius = np.sqrt(2*sxsq_plus_sysq)/10, 
+            #     color = 'blue', fill = False,
+            #       label = 'D4sigma/10'))
+            ax.set_title(f'x0, y0, D4$\sigma$\n{x0:.2f}, {y0:.2f}, {np.sqrt(2*sxsq_plus_sysq):.1f}', loc = 'right')
         fig.colorbar(im, ax=ax)
         ax.legend(loc = (0, 1))
     def rects_hist(self):
