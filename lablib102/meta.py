@@ -113,7 +113,7 @@ class ArrayFrame:
             ax1 = fig.add_subplot(1,2,1)
             ax2 = fig.add_subplot(1,2,2, projection='3d')
             im = ax1.contourf(zz_fit)
-            ax1.set_aspect(self.nsites_y/self.nsites_x)
+            ax1.set_box_aspect(self.nsites_y/self.nsites_x)
             fig.colorbar(im, ax = ax1)
             fig.suptitle(f'A, x0, y0, sxsq_plus_sysq, bg = {self.popt}')
             ax1.set_xlabel('x')

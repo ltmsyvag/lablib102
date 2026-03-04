@@ -29,7 +29,7 @@ def initial_guess_gaussian2d(zz, percentile_thrown = 5):
     return A, x0, y0, sxsq_plus_sysq, bbgg
 if __name__ == '__main__':
     # ---- Generate synthetic data ----
-    nx, ny = 50, 49
+    nx, ny = 50, 30
     x = np.arange(nx)
     y = np.arange(ny)
     xx, yy = np.meshgrid(x, y)
@@ -52,4 +52,7 @@ if __name__ == '__main__':
     zz_fit = gaussian_2d_iso((xx,yy), *popt)
     zz_fit = zz_fit.reshape(zz_noisy.shape)
     fig, ax = plt.subplots()
-    ax.imshow(zz_fit)
+    # ax.imshow(zz_fit)
+    ax.contourf(zz_fit)
+    ax.set_box_aspect(ny/nx)
+    ax.invert_yaxis()
