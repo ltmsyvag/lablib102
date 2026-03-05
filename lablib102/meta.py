@@ -200,7 +200,7 @@ class ArrayFrame:
     def rects_hist(self):
         self._has_rects()
         fig, ax = plt.subplots()
-        hist_heights, _, _ = ax.hist(self.df['rect_mean']/self.rects_pixel_mean, bins=30, label = 'single ROI pixel mean')
+        hist_heights, _, _ = ax.hist(self.df['rect_mean_normed'], bins=30, label = 'single ROI pixel mean')
         ax.axvline(self.total_pixel_mean/self.rects_pixel_mean, color='red', linestyle='dashed', label='total Pixel Mean')
         ax.axvline(self.rects_pixel_mean/self.rects_pixel_mean, color='k', linestyle='dashed', label='Pixel Mean of all ROIs')
         ax.axvline(self.bg_pixel_mean/self.rects_pixel_mean, color='blue', linestyle='dashed', label='Pixel Mean of bg (ROI subtracted)')
