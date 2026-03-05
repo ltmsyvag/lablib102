@@ -194,22 +194,17 @@ class ArrayFrame:
                 (x0, y0), radius = 2, 
                 color = 'red', fill = False, ls = ':',
                   label = 'gaussian peak'))
-            # ax.add_patch(
-            #     Circle(
-            #     (x0, y0), radius = np.sqrt(2*sxsq_plus_sysq)/10, 
-            #     color = 'blue', fill = False,
-            #       label = 'D4sigma/10'))
             ax.set_title(f'x0, y0, D4$\sigma$\n{x0:.2f}, {y0:.2f}, {np.sqrt(2*sxsq_plus_sysq):.1f}', loc = 'right')
         fig.colorbar(im, ax=ax)
         ax.legend(loc = (0, 1))
     def rects_hist(self):
         self._has_rects()
         fig, ax = plt.subplots()
-        ax.hist(self.df['rect_mean']/self.rects_pixel_mean, bins=30, label = 'single ROI pixel mean')
+        hist_heights, _, _ = ax.hist(self.df['rect_mean']/self.rects_pixel_mean, bins=30, label = 'single ROI pixel mean')
         ax.axvline(self.total_pixel_mean/self.rects_pixel_mean, color='red', linestyle='dashed', label='total Pixel Mean')
         ax.axvline(self.rects_pixel_mean/self.rects_pixel_mean, color='k', linestyle='dashed', label='Pixel Mean of all ROIs')
         ax.axvline(self.bg_pixel_mean/self.rects_pixel_mean, color='blue', linestyle='dashed', label='Pixel Mean of bg (ROI subtracted)')
-        ax.errorbar(1, 100, xerr=self.std_of_rect_means/self.rects_pixel_mean,
+        ax.errorbar(1, hist_heights.max()/2, xerr=self.std_of_rect_means/self.rects_pixel_mean,
                     fmt='o', color='black', capsize=20, label = f'hist std = {self.std_of_rect_means/self.rects_pixel_mean:.2f}')
         ax.set_xlabel('relative mean intensity per pixel')
         ax.set_ylabel('frequency')
