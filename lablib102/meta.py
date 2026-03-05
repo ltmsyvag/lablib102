@@ -74,7 +74,7 @@ class ArrayFrame:
         self.bg_pixel_mean = self.imgarr[~total_mask].mean()
         self.total_pixel_mean = self.imgarr.mean()
         pixel_means_by_rects = (arr_sums/(rect_side**2)).flatten()
-        self.std_of_rect_means = pixel_means_by_rects.std()
+        self.std_of_rect_means = pixel_means_by_rects.std(ddof=1)
         ## dataframe
         lst_id2d = [(id1d//self.nsites_x, id1d%self.nsites_x) for id1d in range(self.nsites_x*self.nsites_y)]
         self.df = pd.DataFrame(lst_id2d, columns=['id_y', 'id_x'])
