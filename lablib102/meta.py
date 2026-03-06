@@ -26,10 +26,8 @@ class ArrayFrame:
         self._low_edges = None
         self.df = None
         ## single stats
-        self.rects_pixel_mean = None
         self.bg_pixel_mean = None
         self.total_pixel_mean = None
-        self.std_of_rect_means = None
         self.centroid_of_sites = None # id_X, id_Y
         # misc
         self.percentile_thrown = 50 # 找质心时丢掉的背景, 以及拟合 2d 高斯时的背景 initial guess
@@ -38,7 +36,10 @@ class ArrayFrame:
     def define_rects(self, x1, y1, x2, y2, x3, y3, 
                      nsites_x, nsites_y, rect_side, 
                      figsize = (6.4, 4.8), vmax = None, save_path = None,
-                     fit_gaussian = False):
+                     fit_gaussian = False, 
+                     show_plot = True,
+                     eval_subset = 0 # subset shrunken by dx=dy=n
+                     ):
         vecx = np.array([x2 - x1, y2 - y1])/(nsites_x-1)
         vecy = np.array([x3 - x1, y3 - y1])/(nsites_y-1)
         grid_points_float = np.array([np.array([x1, y1]) + nx*vecx + ny*vecy 
@@ -54,33 +55,30 @@ class ArrayFrame:
             x_low_edge = x - (rect_side - 1) // 2 # 保证 rect_side == 1 时, grid point 对应 rect 左上角
             y_low_edge = y - (rect_side - 1) // 2
             low_edges.append((x_low_edge, y_low_edge))
-            this_block_slice = (slice(y_low_edge, y_low_edge+rect_side), 
+            this_rect_slice = (slice(y_low_edge, y_low_edge+rect_side), 
                            slice(x_low_edge, x_low_edge+rect_side))
             
-            total_mask[this_block_slice] = True
-            this_rect_sum = self.imgarr[this_block_slice].sum()
+            total_mask[this_rect_slice] = True
+            this_rect_sum = self.imgarr[this_rect_slice].sum()
             rect_sums.append(this_rect_sum)
-
 
         self.rects123 = np.round([x1, y1, x2, y2, x3, y3]).astype(int)
         self.nsites_x = nsites_x
         self.nsites_y = nsites_y
         self.rect_side = rect_side
         self._low_edges = low_edges
-        arr_sums = np.array(rect_sums).reshape(nsites_y, nsites_x)
         self.total_mask = total_mask
         ## useful stats
-        self.rects_pixel_mean = self.imgarr[total_mask].mean()
         self.bg_pixel_mean = self.imgarr[~total_mask].mean()
         self.total_pixel_mean = self.imgarr.mean()
-        pixel_means_by_rects = (arr_sums/(rect_side**2)).flatten()
-        self.std_of_rect_means = pixel_means_by_rects.std(ddof=1)
+        
         ## dataframe
         lst_id2d = [(id1d//self.nsites_x, id1d%self.nsites_x) for id1d in range(self.nsites_x*self.nsites_y)]
         self.df = pd.DataFrame(lst_id2d, columns=['id_y', 'id_x'])
+        arr_sums = np.array(rect_sums).reshape(nsites_y, nsites_x)
         self.df['rect_sum'] = arr_sums.flatten()
-        self.df['rect_mean'] = pixel_means_by_rects
-        self.df['rect_mean_normed'] = self.df['rect_mean']/self.rects_pixel_mean
+        self.df['rect_mean'] = self.df['rect_sum']/(rect_side**2)
+        self.df['rect_mean_normed'] = self.df['rect_mean']/self.df['rect_mean'].mean()
         self.df[['frame_coord_x', 'frame_coord_y']] = grid_points_int
         
         ## centroid
@@ -101,8 +99,8 @@ class ArrayFrame:
                                 )
             _, x0, y0, _, _ = self.popt
             self._update_radial_distance(x0, y0, 'r_from_gaussian_peak')
-
-        self.visualize_rects(figsize=figsize, vmax=vmax, save_path=save_path)
+        if show_plot:
+            self.visualize_rects(figsize=figsize, vmax=vmax, save_path=save_path)
     def visualize_gaussian_fit(self):
         if self.popt is not None:
             data_shape = self._arr_rect_mean_normed.shape
@@ -201,11 +199,14 @@ class ArrayFrame:
         self._has_rects()
         fig, ax = plt.subplots()
         hist_heights, _, _ = ax.hist(self.df['rect_mean_normed'], bins=30, label = 'single ROI pixel mean')
-        ax.axvline(self.total_pixel_mean/self.rects_pixel_mean, color='red', linestyle='dashed', label='total Pixel Mean')
-        ax.axvline(self.rects_pixel_mean/self.rects_pixel_mean, color='k', linestyle='dashed', label='Pixel Mean of all ROIs')
-        ax.axvline(self.bg_pixel_mean/self.rects_pixel_mean, color='blue', linestyle='dashed', label='Pixel Mean of bg (ROI subtracted)')
-        ax.errorbar(1, hist_heights.max()/2, xerr=self.std_of_rect_means/self.rects_pixel_mean,
-                    fmt='o', color='black', capsize=20, label = f'hist std = {self.std_of_rect_means/self.rects_pixel_mean:.2f}')
+        mean_of_sites = self.df['rect_mean'].mean()
+        ax.axvline(self.total_pixel_mean/mean_of_sites, color='red', linestyle='dashed', label='total Pixel Mean')
+        ax.axvline(mean_of_sites/mean_of_sites, # looks stupid, but explainatory
+                   color='k', linestyle='dashed', label='Pixel Mean of all ROIs')
+        ax.axvline(self.bg_pixel_mean/mean_of_sites, color='blue', linestyle='dashed', label='Pixel Mean of bg (ROI subtracted)')
+        xerr = self.df['rect_mean_normed'].std(ddof=1)
+        ax.errorbar(1, hist_heights.max()/2, xerr=xerr,
+                    fmt='o', color='black', capsize=20, label = f'hist std = {xerr:.2f}')
         ax.set_xlabel('relative mean intensity per pixel')
         ax.set_ylabel('frequency')
         ax.legend(loc = (1,0))
