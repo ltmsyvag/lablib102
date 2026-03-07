@@ -168,7 +168,7 @@ class ArrayFrame:
         site_arr = self.imgarr[block_slice]
         fig, ax = plt.subplots()
         im = ax.imshow(site_arr, vmax=vmax)
-        ax.set_title(f'site {ix, iy}')
+        ax.set_title(f'site {ix, iy}\nmean {site_arr.mean()}')
         fig.colorbar(im, ax=ax)
     def show_bmp(self, figsize=(6.4, 4.8), vmax=None, save_path=None):
         fig, ax = plt.subplots(figsize=figsize)
@@ -210,7 +210,7 @@ class ArrayFrame:
                 (x0, y0), radius = 2, 
                 color = 'red', fill = False, ls = ':',
                   label = 'gaussian peak'))
-            ax.set_title(f'x0, y0, D4$\sigma$\n{x0:.2f}, {y0:.2f}, {np.sqrt(2*sxsq_plus_sysq):.1f}', loc = 'right')
+            ax.set_title(f'x0, y0, D4$\sigma$\n{x0:.2f}, {y0:.2f}, {4*np.sqrt(sxsq_plus_sysq/2):.1f}', loc = 'right')
         fig.colorbar(im, ax=ax)
         ax.legend(loc = (0, 1))
     def rects_hist(self):
