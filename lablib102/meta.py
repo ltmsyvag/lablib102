@@ -26,8 +26,8 @@ class ArrayFrame:
         self._low_edges = None
         self.df = None
         ## single stats
-        self.bg_pixel_mean = None
-        self.total_pixel_mean = None
+        self._bg_pixel_mean = None
+        self._total_pixel_mean = None
         self.centroid_of_sites = None # id_X, id_Y
         # misc
         self.percentile_thrown = 50 # 找质心时丢掉的背景, 以及拟合 2d 高斯时的背景 initial guess
@@ -106,9 +106,9 @@ class ArrayFrame:
         self.popt = popt
         # self.df = df # df 有特殊性, 会接受上述代码中的 e.g. self._update_radial_distance() 的更新, 因此不能在此统一赋值
         self._arr_rect_mean_normed = arr_rect_mean_normed
-        ## useful stats
-        self.bg_pixel_mean = self.imgarr[~total_mask].mean()
-        self.total_pixel_mean = self.imgarr.mean()
+        ## legacy stats
+        self._bg_pixel_mean = self.imgarr[~total_mask].mean()
+        self._total_pixel_mean = self.imgarr.mean()
 
         if show_plot:
             self.visualize_rects(figsize=figsize, vmax=vmax, save_path=save_path)
@@ -218,13 +218,13 @@ class ArrayFrame:
         fig, ax = plt.subplots()
         bar_heights, bin_edges, _ = ax.hist(self.df['rect_mean_normed'], bins=30, label = 'single ROI pixel mean')
         mean_of_sites = self.df['rect_mean'].mean()
-        ax.axvline(self.total_pixel_mean/mean_of_sites, color='red', linestyle='dashed', label='total Pixel Mean')
+        # ax.axvline(self.total_pixel_mean/mean_of_sites, color='red', linestyle='dashed', label='total Pixel Mean')
         ax.axvline(mean_of_sites/mean_of_sites, # looks stupid, but explainatory
-                   color='k', linestyle='dashed', label='Pixel Mean of all ROIs')
-        ax.axvline(self.bg_pixel_mean/mean_of_sites, color='blue', linestyle='dashed', label='Pixel Mean of bg (ROI subtracted)')
+                   color='k', linestyle='dashed', label='Mean of all ROIs')
+        # ax.axvline(self.bg_pixel_mean/mean_of_sites, color='blue', linestyle='dashed', label='Pixel Mean of bg (ROI subtracted)')
         xerr = self.df['rect_mean_normed'].std(ddof=1)
         ax.errorbar(1, bar_heights.max()/2, xerr=xerr,
-                    fmt='o', color='black', capsize=20, label = f'hist std = {xerr:.2f}\n')
+                    fmt='o', color='black', capsize=20, label = f'hist std = {xerr:.3f}\n')
         
         ### sub array hist
         series_subarr = self.df['rect_mean_normed_subarr']
@@ -237,10 +237,10 @@ class ArrayFrame:
             xerr = series_subarr.std(ddof=1)
             ax.errorbar(series_subarr.mean(), bar_heights.max()/2, 
                         xerr=xerr, fmt = 'o', color = 'orange', 
-                        capsize = 20, label = f'hist std = {xerr:.2f} (global norm)\n')
+                        capsize = 20, label = f'hist std = {xerr:.3f} (global norm)\n')
             ax.errorbar(series_subarr.mean(), bar_heights.max()/3, 
                         xerr=xerr/series_subarr.mean(), fmt = 'o', color = 'crimson', 
-                        capsize = 20, label = f'hist std = {xerr:.2f} (subarray norm)\n')
+                        capsize = 20, label = f'hist std = {xerr:.3f} (subarray norm)\n')
             ax.axvline(series_subarr.mean(),
                     color='orange', 
                     linestyle='dashed', label='Pixel Mean of subselection of ROIs')
