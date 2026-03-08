@@ -238,9 +238,9 @@ class ArrayFrame:
         self._has_rects()
         fig, ax = plt.subplots()
         bar_heights, bin_edges, _ = ax.hist(self.df['rect_mean_normed'], bins=30, label = 'single ROI pixel mean')
-        mean_of_sites = self.df['rect_mean'].mean()
+        # mean_of_sites = self.df['rect_mean'].mean()
         # ax.axvline(self.total_pixel_mean/mean_of_sites, color='red', linestyle='dashed', label='total Pixel Mean')
-        ax.axvline(mean_of_sites/mean_of_sites, # looks stupid, but explainatory
+        ax.axvline(1, 
                    color='k', linestyle='dashed', label='Mean of all ROIs')
         # ax.axvline(self.bg_pixel_mean/mean_of_sites, color='blue', linestyle='dashed', label='Pixel Mean of bg (ROI subtracted)')
         xerr = self.df['rect_mean_normed'].std(ddof=1)
@@ -268,6 +268,6 @@ class ArrayFrame:
                         linestyle='dashed', label='Pixel Mean of subselection of ROIs')
                 
             
-            ax.set_xlabel('relative intensity')
-            ax.set_ylabel('frequency')
-            ax.legend(loc = (1,0))
+        ax.set_xlabel('relative intensity')
+        ax.set_ylabel('frequency')
+        ax.legend(loc = (1,0))
