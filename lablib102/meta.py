@@ -21,10 +21,11 @@ class ArrayFrame:
         """
         self.total_mask = None
         self.rects123 = None, None, None, None, None, None
-        self.nsites_x, self.nsites_y = None, None
+        # self.nsites_x, self.nsites_y = None, None
         self.rect_side = None
         self._low_edges = None
         self.df = None
+        self.arr_sums = None
         ## single stats
         self._bg_pixel_mean = None
         self._total_pixel_mean = None
@@ -47,6 +48,7 @@ class ArrayFrame:
                         for nx in range(nsites_x)
                         ])
         grid_points_int = np.round(grid_points_float).astype(int)
+        # self.grid_points_int = grid_points_int
         rect_side = round(rect_side)
         rect_sums = []
         low_edges = []
@@ -60,15 +62,12 @@ class ArrayFrame:
             total_mask[this_rect_slice] = True
             this_rect_sum = self.imgarr[this_rect_slice].sum()
             rect_sums.append(this_rect_sum)
+        arr_sums = np.array(rect_sums).reshape(nsites_y,-1)
 
         ## dataframe
-        lst_id2d = [(id1d//nsites_x, id1d%nsites_x) 
-                    for id1d in range(nsites_x*nsites_y)]
-        self.df = pd.DataFrame(lst_id2d, columns=['id_y', 'id_x'])
-        arr_sums = np.array(rect_sums).reshape(nsites_y, nsites_x)
-        self.df['rect_sum'] = arr_sums.flatten()
+        self._make_df_from_arr_sums(arr_sums) # make cols that can solely be derived from arr_sums (site coordiantes, normalized intensity)
+        # cols that needs extra info aside from arr_sums
         self.df['rect_mean'] = self.df['rect_sum']/(rect_side**2)
-        self.df['rect_mean_normed'] = self.df['rect_mean']/self.df['rect_mean'].mean()
         self.df[['frame_coord_x', 'frame_coord_y']] = grid_points_int
         if npeeled:
             mask_subarr = (npeeled<=self.df['id_x']) & (self.df['id_x']<(nsites_x-npeeled)) & (npeeled<=self.df['id_y']) & (self.df['id_y']<(nsites_y-npeeled))
@@ -98,13 +97,14 @@ class ArrayFrame:
         
         ### state assignments
         self.rects123 = np.round([x1, y1, x2, y2, x3, y3]).astype(int)
-        self.nsites_x = nsites_x
-        self.nsites_y = nsites_y
+        # self.nsites_x = nsites_x
+        # self.nsites_y = nsites_y
         self.rect_side = rect_side
         self._low_edges = low_edges
         self.total_mask = total_mask
         self.popt = popt
-        # self.df = df # df 有特殊性, 会接受上述代码中的 e.g. self._update_radial_distance() 的更新, 因此不能在此统一赋值
+        self.arr_sums = arr_sums
+        # self.df = df # df 有特殊性, 会接受上述代码中的 e.g. self._update_radial_distance() 的更新, 因此不能在代码末统一赋值
         self._arr_rect_mean_normed = arr_rect_mean_normed
         ## legacy stats
         self._bg_pixel_mean = self.imgarr[~total_mask].mean()
@@ -122,7 +122,8 @@ class ArrayFrame:
             ax1 = fig.add_subplot(1,2,1)
             ax2 = fig.add_subplot(1,2,2, projection='3d')
             im = ax1.contourf(zz_fit)
-            ax1.set_box_aspect(self.nsites_y/self.nsites_x)
+            nsites_y, nsites_x = self.arr_sums.shape
+            ax1.set_box_aspect(nsites_y/nsites_x)
             fig.colorbar(im, ax = ax1)
             fig.suptitle(f'A, x0, y0, sxsq_plus_sysq, bg = {self.popt}')
             ax1.set_xlabel('x')
@@ -141,6 +142,32 @@ class ArrayFrame:
             ax2.legend()
         else:
             raise ValueError('no fit stored!')
+    def _make_df_from_arr_sums(self, zz: np.ndarray, npeeled = 0):
+        """
+        sans 'rect_mean', and 'frame_coord_x/y',
+        which needs info of rect_side and rect coordiates,
+        which are not essential for site merging
+        """
+        _, nsites_x = zz.shape
+        lst_id2d = [(id1d//nsites_x, id1d%nsites_x) 
+                    for id1d in range(zz.size)]
+        self.df = pd.DataFrame(lst_id2d, columns=['id_y', 'id_x'])
+        self.df['rect_sum'] = zz.flatten()
+        self.df['rect_mean_normed'] = self.df['rect_sum']/(self.df['rect_sum'].mean())
+        # if npeeled:
+        #     mask_subarr = (npeeled<=self.df['id_x']) & (self.df['id_x']<(nsites_x-npeeled)) & (npeeled<=self.df['id_y']) & (self.df['id_y']<(nsites_y-npeeled))
+        #     self.df['rect_mean_normed_subarr'] = self.df['rect_mean_normed'][mask_subarr]
+        # else:
+        #     self.df['rect_mean_normed_subarr'] = np.nan
+    def peel(self, npeeled: int):
+        assert self.arr_sums is not None, 'no site intensity data, nothing to peel!'
+        nsites_y, nsites_x = self.arr_sums
+        if npeeled:
+            mask_subarr = (npeeled<=self.df['id_x']) & (self.df['id_x']<(nsites_x-npeeled)) & (npeeled<=self.df['id_y']) & (self.df['id_y']<(nsites_y-npeeled))
+            self.df['rect_mean_normed_subarr'] = self.df['rect_mean_normed'][mask_subarr]
+        else:
+            self.df['rect_mean_normed_subarr'] = np.nan
+        ...
     def _update_radial_distance(self, x0, y0, col):
         # self.centroid_of_sites = x0, y0
         self.df[col] = np.sqrt(
@@ -161,7 +188,8 @@ class ArrayFrame:
             raise ValueError("Please call define_rects first to define rects.")
     def visualize_single_rect(self, ix, iy, vmax = None):
         self._has_rects()
-        id1d = iy*self.nsites_x + ix
+        _, nsites_x = self.arr_sums.shape
+        id1d = iy*nsites_x + ix
         x_low_edge, y_low_edge = self._low_edges[id1d]
         block_slice = (slice(y_low_edge, y_low_edge+self.rect_side),
                        slice(x_low_edge, x_low_edge+self.rect_side))
@@ -171,6 +199,7 @@ class ArrayFrame:
         ax.set_title(f'site {ix, iy}\nmean {site_arr.mean()}')
         fig.colorbar(im, ax=ax)
     def show_bmp(self, figsize=(6.4, 4.8), vmax=None, save_path=None):
+        assert self.imgarr is not None, 'no arr data! this object is merged from multiple ArrayFrame objects??' # 合成的的 ArrayFrame 实例没有 frame 数据, 只有选取 sites 强度数据
         fig, ax = plt.subplots(figsize=figsize)
         extent = 0, self.imgarr.shape[1],  self.imgarr.shape[0], 0
         ax.imshow(self.imgarr, extent=extent, vmax=vmax)
@@ -178,6 +207,7 @@ class ArrayFrame:
             fig.savefig(save_path, dpi=600)
     def visualize_rects(self, figsize = (6.4, 4.8), vmax = None, save_path = None, see_subarr = False):
         self._has_rects()
+        nsites_y, nsites_x = self.arr_sums.shape
         fig, ax = plt.subplots(figsize = figsize)
         extent = 0, self.imgarr.shape[1],  self.imgarr.shape[0], 0
         ax.imshow(self.imgarr, extent=extent, vmax = vmax)
@@ -192,7 +222,7 @@ class ArrayFrame:
         x1, y1, x2, y2, x3, y3 = self.rects123
         ax.set_title(f'{'subselection' if see_subarr else 'full selection'}\n\
                       x1 {x1}, y1 {y1}, x2 {x2}, y2 {y2}, x3 {x3}, y3 {y3}, \
-                     nx/ny {self.nsites_x}/{self.nsites_y},\
+                     nx/ny {nsites_x}/{nsites_y},\
                           rect_side {self.rect_side}\n{lablib102.__version__}',)
         if save_path is not None:
             fig.savefig(save_path, dpi=600)
@@ -246,6 +276,6 @@ class ArrayFrame:
                     linestyle='dashed', label='Pixel Mean of subselection of ROIs')
             
         
-        ax.set_xlabel('relative mean intensity per pixel')
+        ax.set_xlabel('relative intensity')
         ax.set_ylabel('frequency')
         ax.legend(loc = (1,0))
