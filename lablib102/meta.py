@@ -9,9 +9,15 @@ from .gaussian2d import gaussian_2d_iso, initial_guess_gaussian2d
 from scipy.optimize import curve_fit
 import lablib102
 class ArrayFrame:
-    def __init__(self, path):
-        self.path = path
-        self.imgarr = np.array(Image.open(path).convert('L'))
+    def __init__(self, arg): # list of ndarray or string
+        self.path = None
+        self.imgarr = None
+        self.arr_sums = None
+        self.df = None
+        self.percentile_thrown = 50 # 找质心时丢掉的背景, 以及拟合 2d 高斯时的背景 initial guess
+        self.popt = None # # A, x0, y0, sxsq_plus_sysq, bg
+        self.centroid_of_sites = None # id_X, id_Y
+        self.total_mask = None
         """
             三个点的位置:
                1**********2
@@ -19,20 +25,22 @@ class ArrayFrame:
              ************
             3***********
         """
-        self.total_mask = None
         self.rects123 = None, None, None, None, None, None
         self.rect_side = None
         self._low_edges = None
-        self.df = None
-        self.arr_sums = None
         ## single stats
         self._bg_pixel_mean = None
         self._total_pixel_mean = None
-        self.centroid_of_sites = None # id_X, id_Y
-        # misc
-        self.percentile_thrown = 50 # 找质心时丢掉的背景, 以及拟合 2d 高斯时的背景 initial guess
-        self._arr_rect_mean_normed = None
-        self.popt = None # A, x0, y0, sxsq_plus_sysq, bg
+
+        ## store data
+        if type(arg) is not str:
+            arr_sums = np.block(arg)
+            self._make_df_from_arr_sums(arr_sums)
+            # print(self.df)
+            self.arr_sums = arr_sums
+        else:
+            self.path = arg
+            self.imgarr = np.array(Image.open(arg).convert('L'))
     def define_rects(self, x1, y1, x2, y2, x3, y3, 
                      nsites_x, nsites_y, rect_side, 
                      figsize = (6.4, 4.8), vmax = None, save_path = None,
@@ -60,53 +68,47 @@ class ArrayFrame:
             total_mask[this_rect_slice] = True
             this_rect_sum = self.imgarr[this_rect_slice].sum()
             rect_sums.append(this_rect_sum)
-        arr_sums = np.array(rect_sums).reshape(nsites_y,-1)
+        self.arr_sums = np.array(rect_sums).reshape(nsites_y,-1) # gaussian 拟合需要, 因此先为实例赋值
 
         ## dataframe
-        self._make_df_from_arr_sums(arr_sums) # make cols that can solely be derived from arr_sums (site coordiantes, normalized intensity)
+        self._make_df_from_arr_sums(self.arr_sums) # make cols that can solely be derived from arr_sums (site coordiantes, normalized intensity)
         # cols that needs extra info aside from arr_sums
         self.df['rect_mean'] = self.df['rect_sum']/(rect_side**2)
         self.df[['frame_coord_x', 'frame_coord_y']] = grid_points_int
-
-        ## centroid
-        x0, y0 = self.get_site_centroid(arr_sums)
-        self._update_radial_distance(x0, y0, 'r_from_centroid')
-
+        
         ## 2d gaussian fit
-        arr_rect_mean_normed = self.df['rect_mean_normed'].values.reshape(nsites_y, nsites_x)
+        # arr_rect_mean_normed = self.df['rect_mean_normed'].values.reshape(nsites_y, nsites_x)
         if fit_gaussian:
-            yy, xx = np.indices(arr_rect_mean_normed.shape)
-            popt, _ = curve_fit(gaussian_2d_iso,
-                                (xx, yy), 
-                                arr_rect_mean_normed.ravel(),
-                                p0 = initial_guess_gaussian2d(
-                                    arr_rect_mean_normed, 
-                                    percentile_thrown=self.percentile_thrown)
-                                )
-            _, x0, y0, _, _ = popt
-            self._update_radial_distance(x0, y0, 'r_from_gaussian_peak')
-        else:
-            popt = None
-            self.df['r_from_gaussian_peak'] = np.nan
+            self.fit_gaussian()
         
         ### state assignments
         self.rects123 = np.round([x1, y1, x2, y2, x3, y3]).astype(int)
         self.rect_side = rect_side
         self._low_edges = low_edges
         self.total_mask = total_mask
-        self.popt = popt
-        self.arr_sums = arr_sums
-        # self.df = df # df 有特殊性, 会接受上述代码中的 e.g. self._update_radial_distance() 的更新, 因此不能在代码末统一赋值
-        self._arr_rect_mean_normed = arr_rect_mean_normed
+
         ## legacy stats
         self._bg_pixel_mean = self.imgarr[~total_mask].mean()
         self._total_pixel_mean = self.imgarr.mean()
 
         if show_plot:
             self.visualize_rects(figsize=figsize, vmax=vmax, save_path=save_path)
+    def fit_gaussian(self):
+        arr_mean_normed = self.arr_sums/self.arr_sums.mean()
+        yy, xx = np.indices(arr_mean_normed.shape)
+        popt, _ = curve_fit(gaussian_2d_iso, (xx, yy), arr_mean_normed.ravel(), 
+                            p0 = initial_guess_gaussian2d(
+                                arr_mean_normed, 
+                                percentile_thrown=self.percentile_thrown
+                                )
+                            )
+        _, x0, y0, _, _ = popt
+        self._update_radial_distance(x0, y0, 'r_from_gaussian_peak')
+        self.popt = popt
     def visualize_gaussian_fit(self):
         if self.popt is not None:
-            data_shape = self._arr_rect_mean_normed.shape
+            print(self.popt)
+            data_shape = self.arr_sums.shape
             yy, xx = np.indices(data_shape)
             zz_fit = gaussian_2d_iso((xx, yy), *self.popt)
             zz_fit = zz_fit.reshape(data_shape)
@@ -126,7 +128,7 @@ class ArrayFrame:
             ax2.plot_wireframe(xx, yy, zz_fit, color = 'k',
                                rstride = 2, cstride = 2,
                                 label = 'gaussian fit', alpha = 1)
-            ax2.plot_surface(xx, yy, self._arr_rect_mean_normed, cmap = 'jet',
+            ax2.plot_surface(xx, yy, self.arr_sums/self.arr_sums.mean(), cmap = 'jet',
                                alpha=0.3, label = 'data')
             ax2.set_xlabel('x')
             ax2.set_ylabel('y')
@@ -134,7 +136,7 @@ class ArrayFrame:
             ax2.legend()
         else:
             raise ValueError('no fit stored!')
-    def _make_df_from_arr_sums(self, zz: np.ndarray, npeeled = 0):
+    def _make_df_from_arr_sums(self, zz: np.ndarray):
         """
         sans 'rect_mean', and 'frame_coord_x/y',
         which needs info of rect_side and rect coordiates,
@@ -146,6 +148,10 @@ class ArrayFrame:
         self.df = pd.DataFrame(lst_id2d, columns=['id_y', 'id_x'])
         self.df['rect_sum'] = zz.flatten()
         self.df['rect_mean_normed'] = self.df['rect_sum']/(self.df['rect_sum'].mean())
+        
+        ## centroid
+        x0, y0 = self.get_site_centroid(zz)
+        self._update_radial_distance(x0, y0, 'r_from_centroid')
     def peel(self, npeeled: int):
         assert self.arr_sums is not None, 'no site intensity data, nothing to peel!'
         nsites_y, nsites_x = self.arr_sums.shape
@@ -214,7 +220,7 @@ class ArrayFrame:
     def visualize_site_homogeneity(self):
         self._has_rects()
         fig, ax = plt.subplots()
-        im = ax.imshow(self._arr_rect_mean_normed)
+        im = ax.imshow(self.arr_sums/self.arr_sums.mean())
         ax.add_patch(Circle(
             self.centroid_of_sites, radius=2, color='black', fill = False,
             label = 'centroid of sites'))
