@@ -1,6 +1,3 @@
-```math
-\newcommand{\mathrm}d[1]{ \, \mathrm{d}{#1} \,}
-```
 custom functions and modules for A102 and A116
 # modules
 explain modules
