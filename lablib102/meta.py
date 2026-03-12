@@ -1,4 +1,5 @@
 #%%
+from typing import List
 from PIL import Image
 import numpy as np
 import matplotlib.pyplot as plt
@@ -8,8 +9,10 @@ from scipy import ndimage
 from .gaussian2d import gaussian_2d_iso, initial_guess_gaussian2d
 from scipy.optimize import curve_fit
 import lablib102
+import warnings
+from harvesters.core import Harvester
 class ArrayFrame:
-    def __init__(self, arg): # list of ndarray or string
+    def __init__(self, arg: None | str | List[np.ndarray] | List[List[np.ndarray]] = None): # list of ndarray or string
         self.path = None
         self.imgarr = None
         self.arr_sums = None
@@ -33,14 +36,18 @@ class ArrayFrame:
         self._total_pixel_mean = None
 
         ## store data
-        if type(arg) is not str:
+        if arg is None:
+            print('hello')
+        elif isinstance(arg, str):
+            self.path = arg
+            self.imgarr = np.array(Image.open(arg).convert('L'))
+        elif isinstance(arg, list):
             arr_sums = np.block(arg)
             self._make_df_from_arr_sums(arr_sums)
             # print(self.df)
             self.arr_sums = arr_sums
         else:
-            self.path = arg
-            self.imgarr = np.array(Image.open(arg).convert('L'))
+            raise ValueError('unrecognized argument!')
     def define_rects(self, x1, y1, x2, y2, x3, y3, 
                      nsites_x, nsites_y, rect_side, 
                      figsize = (6.4, 4.8), vmax = None, save_path = None,
@@ -211,10 +218,10 @@ class ArrayFrame:
                                 self.rect_side, self.rect_side, 
                                 fill=False, edgecolor='red', linewidth=0.5))
         x1, y1, x2, y2, x3, y3 = self.rects123
-        ax.set_title(f'{'subselection' if see_subarr else 'full selection'}\n\
+        ax.set_title(f"{'subselection' if see_subarr else 'full selection'}\n\
                       x1 {x1}, y1 {y1}, x2 {x2}, y2 {y2}, x3 {x3}, y3 {y3}, \
                      nx/ny {nsites_x}/{nsites_y},\
-                          rect_side {self.rect_side}\n{lablib102.__version__}',)
+                          rect_side {self.rect_side}\n{lablib102.__version__}",)
         if save_path is not None:
             fig.savefig(save_path, dpi=600)
     def visualize_site_homogeneity(self):
