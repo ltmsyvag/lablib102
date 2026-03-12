@@ -107,7 +107,6 @@ class ArrayFrame:
         elif isinstance(arg, list):
             arr_sums = np.block(arg)
             self._make_df_from_arr_sums(arr_sums)
-            # print(self.df)
             self.arr_sums = arr_sums
         else:
             raise ValueError('unrecognized argument!')
@@ -177,7 +176,6 @@ class ArrayFrame:
         self.popt = popt
     def visualize_gaussian_fit(self, save_path = None):
         if self.popt is not None:
-            print(self.popt)
             data_shape = self.arr_sums.shape
             yy, xx = np.indices(data_shape)
             zz_fit = gaussian_2d_iso((xx, yy), *self.popt)
