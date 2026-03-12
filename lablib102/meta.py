@@ -41,7 +41,7 @@ class ArrayFrame:
         ## single stats
         self._bg_pixel_mean = None
         self._total_pixel_mean = None
-        self.node_map = None
+        self.ia_nodemap_dict = None # selected properties from an image acquirer's node map
         self.cam_info_dict = None
         ## store data
         if isinstance(arg, numbers.Number):
@@ -70,7 +70,6 @@ class ArrayFrame:
                 若写在 #2, 则会触发一个 ia 只能 start-stop 一次的 bug,
                 遇上 faulty rows 程序马上崩
                 '''
-                ## 
                 while True: 
                     print(f'cycle {i}')
                     i+=1
@@ -78,22 +77,26 @@ class ArrayFrame:
                         with h.create(0) as ia:
                             try:
                             # time.sleep(0.1)
-                                ia.remote_device.node_map.ExposureTime.value = arg
-                                self.node_map = ia.remote_device.node_map
+                                nm = ia.remote_device.node_map
+                                nm.ExposureTime.value = arg
+                                self.ia_nodemap_dict=dict(
+                                    ExposureTime = nm.ExposureTime.value,
+                                    DeviceCharacterSet = nm.DeviceCharacterSet.value,
+                                    TriggerMode = nm.TriggerMode.value,
+                                    TriggerSource = nm.TriggerSource.value,
+                                )
                                 ia.start()
                                 with ia.fetch(timeout=3) as buffer:
                                     component = buffer.payload.components[0]
                                     imgarr = component.data.reshape(component.height, component.width)
-                                    # print(faulty_rows)
                                 ia.stop()
                             except TimeoutException as e: # 提供 timeout 机制, 防止卡死(真会卡死!)
                                 print('timeout!')
                                 continue
-                    except AccessDeniedException: # 防止 ia 创建时随机的 access deny 报错 (真会报错!)
+                    except AccessDeniedException: # 防止 ia 创建时随机的 access deny 报错 (真会连不上!)
                         print('access denied!')
                         continue
                     faulty_rows = np.all(imgarr == 0, axis =1)
-                    # if faultyrow_check_override or (not faulty_rows.any()):
                     if faultyrow_check_override or (faulty_rows.sum()<=10):
                         break
             self.imgarr=imgarr
@@ -261,8 +264,12 @@ class ArrayFrame:
         fig, ax = plt.subplots(figsize=figsize)
         extent = 0, self.imgarr.shape[1],  self.imgarr.shape[0], 0
         ax.imshow(self.imgarr, extent=extent, vmax=vmax)
+        ax.set_title(f"{self.cam_info_dict['display_name']}\n\
+                     ExposureTime {self.ia_nodemap_dict['ExposureTime']} µm")
+        # ax.set_title(self.node_map.ExposureTime.value)
         if save_path is not None:
-            fig.savefig(save_path, dpi=600)
+            Image.fromarray(self.imgarr).save(save_path)
+            # fig.savefig(save_path, dpi=600)
     def visualize_rects(self, figsize = (6.4, 4.8), vmax = None, save_path = None, see_subarr = False):
         self._has_rects()
         nsites_y, nsites_x = self.arr_sums.shape
@@ -279,9 +286,11 @@ class ArrayFrame:
                                 fill=False, edgecolor='red', linewidth=0.5))
         x1, y1, x2, y2, x3, y3 = self.rects123
         ax.set_title(f"{'subselection' if see_subarr else 'full selection'}\n\
-                      x1 {x1}, y1 {y1}, x2 {x2}, y2 {y2}, x3 {x3}, y3 {y3}, \
-                     nx/ny {nsites_x}/{nsites_y},\
-                          rect_side {self.rect_side}\n{lablib102.__version__}",)
+x1 {x1}, y1 {y1}, x2 {x2}, y2 {y2}, x3 {x3}, y3 {y3}, \
+nx/ny {nsites_x}/{nsites_y}, \
+rect_side {self.rect_side}\n\
+{self.cam_info_dict['display_name']}  ExposureTime {self.ia_nodemap_dict['ExposureTime']} µm\n\
+{lablib102.__version__}",)
         if save_path is not None:
             fig.savefig(save_path, dpi=600)
     def visualize_site_homogeneity(self):
