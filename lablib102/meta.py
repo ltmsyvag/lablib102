@@ -52,6 +52,7 @@ class ArrayFrame:
                 h.add_file(r'C:\Program Files (x86)\Common Files\MVS\Runtime\Win64_x64\MvProducerGEV.cti')
                 h.update()
                 self.cam_info_dict = h.device_info_list[0].property_dict
+                # print(self.cam_info_dict)
                 i = 1
                 '''
                 以下 while loop 只能写在 ia 创建前, 
@@ -264,12 +265,16 @@ class ArrayFrame:
         fig, ax = plt.subplots(figsize=figsize)
         extent = 0, self.imgarr.shape[1],  self.imgarr.shape[0], 0
         ax.imshow(self.imgarr, extent=extent, vmax=vmax)
-        ax.set_title(f"{self.cam_info_dict['display_name']}\n\
-                     ExposureTime {self.ia_nodemap_dict['ExposureTime']} µm")
+        ax.set_title(self.str_iainfo())
         # ax.set_title(self.node_map.ExposureTime.value)
         if save_path is not None:
             Image.fromarray(self.imgarr).save(save_path)
             # fig.savefig(save_path, dpi=600)
+    def str_iainfo(self):
+        iainfo = ''
+        if self.cam_info_dict is not None:
+            iainfo = f"{self.cam_info_dict['display_name']}  ExposureTime {self.ia_nodemap_dict['ExposureTime']} µm"
+        return iainfo
     def visualize_rects(self, figsize = (6.4, 4.8), vmax = None, save_path = None, see_subarr = False):
         self._has_rects()
         nsites_y, nsites_x = self.arr_sums.shape
@@ -289,7 +294,7 @@ class ArrayFrame:
 x1 {x1}, y1 {y1}, x2 {x2}, y2 {y2}, x3 {x3}, y3 {y3}, \
 nx/ny {nsites_x}/{nsites_y}, \
 rect_side {self.rect_side}\n\
-{self.cam_info_dict['display_name']}  ExposureTime {self.ia_nodemap_dict['ExposureTime']} µm\n\
+{self.str_iainfo()}\n\
 {lablib102.__version__}",)
         if save_path is not None:
             fig.savefig(save_path, dpi=600)
