@@ -13,9 +13,13 @@ import warnings
 from harvesters.core import Harvester
 import numbers
 import sys
-import time
+# import time
+from genicam.gentl import TimeoutException, AccessDeniedException
+
 class ArrayFrame:
-    def __init__(self, arg: numbers.Number | str | List[np.ndarray] | List[List[np.ndarray]] = None): # list of ndarray or string
+    def __init__(self, 
+                 arg: numbers.Number | str | List[np.ndarray] | List[List[np.ndarray]],
+                 faultyrow_check_override: bool = False): # list of ndarray or string
         self.path = None
         self.imgarr = None
         self.arr_sums = None
@@ -48,7 +52,7 @@ class ArrayFrame:
                 h.add_file(r'C:\Program Files (x86)\Common Files\MVS\Runtime\Win64_x64\MvProducerGEV.cti')
                 h.update()
                 self.cam_info_dict = h.device_info_list[0].property_dict
-                # i = 1
+                i = 1
                 '''
                 以下 while loop 只能写在 ia 创建前, 
                 不能写在 ia 创建后, 原因不明. 
@@ -62,26 +66,35 @@ class ArrayFrame:
                     ia.stop()
                 
                 经测试, while loop 只能写在 #1
-                若写在 #3, 则 faulty_rows check 失效 (有 faulty rows 的 imgarr 也可以通过 break check)
+                若写在 #3, 则会出现多次 buffer 获取后卡死的现象
                 若写在 #2, 则会触发一个 ia 只能 start-stop 一次的 bug,
                 遇上 faulty rows 程序马上崩
                 '''
                 ## 
                 while True: 
-                    # print(f'cycle {i}')
-                    # i+=1
-                    with h.create(0) as ia:
-                        time.sleep(0.1)
-                        ia.remote_device.node_map.ExposureTime.value = arg
-                        self.node_map = ia.remote_device.node_map
-                        ia.start()
-                        with ia.fetch() as buffer:
-                            component = buffer.payload.components[0]
-                            imgarr = component.data.reshape(component.height, component.width)
-                            # print(faulty_rows)
-                        ia.stop()
+                    print(f'cycle {i}')
+                    i+=1
+                    try:
+                        with h.create(0) as ia:
+                            try:
+                            # time.sleep(0.1)
+                                ia.remote_device.node_map.ExposureTime.value = arg
+                                self.node_map = ia.remote_device.node_map
+                                ia.start()
+                                with ia.fetch(timeout=3) as buffer:
+                                    component = buffer.payload.components[0]
+                                    imgarr = component.data.reshape(component.height, component.width)
+                                    # print(faulty_rows)
+                                ia.stop()
+                            except TimeoutException as e: # 提供 timeout 机制, 防止卡死(真会卡死!)
+                                print('timeout!')
+                                continue
+                    except AccessDeniedException: # 防止 ia 创建时随机的 access deny 报错 (真会报错!)
+                        print('access denied!')
+                        continue
                     faulty_rows = np.all(imgarr == 0, axis =1)
-                    if not faulty_rows.any():
+                    # if faultyrow_check_override or (not faulty_rows.any()):
+                    if faultyrow_check_override or (faulty_rows.sum()<=10):
                         break
             self.imgarr=imgarr
                     
