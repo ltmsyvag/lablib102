@@ -52,7 +52,6 @@ class ArrayFrame:
                 h.add_file(r'C:\Program Files (x86)\Common Files\MVS\Runtime\Win64_x64\MvProducerGEV.cti')
                 h.update()
                 self.cam_info_dict = h.device_info_list[0].property_dict
-                # print(self.cam_info_dict)
                 i = 1
                 '''
                 以下 while loop 只能写在 ia 创建前, 
@@ -176,7 +175,7 @@ class ArrayFrame:
         _, x0, y0, _, _ = popt
         self._update_radial_distance(x0, y0, 'r_from_gaussian_peak')
         self.popt = popt
-    def visualize_gaussian_fit(self):
+    def visualize_gaussian_fit(self, save_path = None):
         if self.popt is not None:
             print(self.popt)
             data_shape = self.arr_sums.shape
@@ -205,6 +204,8 @@ class ArrayFrame:
             ax2.set_ylabel('y')
             ax2.invert_yaxis()
             ax2.legend()
+            if save_path is not None:
+                fig.savefig(save_path)
         else:
             raise ValueError('no fit stored!')
     def _make_df_from_arr_sums(self, zz: np.ndarray):
@@ -248,7 +249,7 @@ class ArrayFrame:
     def _has_rects(self):
         if self.rects123 is None:
             raise ValueError("Please call define_rects first to define rects.")
-    def visualize_single_rect(self, ix, iy, vmax = None):
+    def visualize_single_rect(self, ix, iy, vmax = None, save_path = None):
         self._has_rects()
         _, nsites_x = self.arr_sums.shape
         id1d = iy*nsites_x + ix
@@ -260,6 +261,8 @@ class ArrayFrame:
         im = ax.imshow(site_arr, vmax=vmax)
         ax.set_title(f'site {ix, iy}\nmean {site_arr.mean()}')
         fig.colorbar(im, ax=ax)
+        if save_path is not None:
+            fig.savefig(save_path)
     def show_bmp(self, figsize=(6.4, 4.8), vmax=None, save_path=None):
         assert self.imgarr is not None, 'no arr data! this object is merged from multiple ArrayFrame objects??' # 合成的的 ArrayFrame 实例没有 frame 数据, 只有选取 sites 强度数据
         fig, ax = plt.subplots(figsize=figsize)
@@ -298,7 +301,7 @@ rect_side {self.rect_side}\n\
 {lablib102.__version__}",)
         if save_path is not None:
             fig.savefig(save_path, dpi=600)
-    def visualize_site_homogeneity(self):
+    def visualize_site_homogeneity(self, save_path = None):
         self._has_rects()
         fig, ax = plt.subplots()
         im = ax.imshow(self.arr_sums/self.arr_sums.mean())
@@ -315,7 +318,9 @@ rect_side {self.rect_side}\n\
             ax.set_title(f'x0, y0, D4$\sigma$\n{x0:.2f}, {y0:.2f}, {4*np.sqrt(sxsq_plus_sysq/2):.1f}', loc = 'right')
         fig.colorbar(im, ax=ax)
         ax.legend(loc = (0, 1))
-    def rects_hist(self):
+        if save_path is not None:
+            fig.savefig(save_path)
+    def rects_hist(self, save_path = None):
         self._has_rects()
         fig, ax = plt.subplots()
         bar_heights, bin_edges, _ = ax.hist(self.df['rect_mean_normed'], bins=30, label = 'single ROI pixel mean')
@@ -352,3 +357,5 @@ rect_side {self.rect_side}\n\
         ax.set_xlabel('relative intensity')
         ax.set_ylabel('frequency')
         ax.legend(loc = (1,0))
+        if save_path is not None:
+            fig.savefig(save_path)
