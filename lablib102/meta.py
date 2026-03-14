@@ -19,7 +19,9 @@ from genicam.gentl import TimeoutException, AccessDeniedException
 class ArrayFrame:
     def __init__(self, 
                  arg: numbers.Number | str | List[np.ndarray] | List[List[np.ndarray]],
-                 faultyrow_check_override: bool = False): # list of ndarray or string
+                #  faultyrow_check_override: bool = False,
+                 camtype: str = 'GEV' # U3V or GEV
+                 ):
         self.path = None
         self.imgarr = None
         self.arr_sums = None
@@ -49,39 +51,22 @@ class ArrayFrame:
             if (sys.version_info.major == 3) and (sys.version_info.minor > 10):
                 warnings.warn('cam control might need python <= 3.10')
             with Harvester() as h:
-                h.add_file(r'C:\Program Files (x86)\Common Files\MVS\Runtime\Win64_x64\MvProducerGEV.cti')
+                h.add_file(f'C:/Program Files (x86)/Common Files/MVS/Runtime/Win64_x64/MvProducer{camtype}.cti')
                 h.update()
                 self.cam_info_dict = h.device_info_list[0].property_dict
-                i = 1
                 '''
-                以下 while loop 只能写在 ia 创建前, 
-                不能写在 ia 创建后, 原因不明. 
-                我们有如下结构
-
-                #1
-                <ia 创建>
-                    #2
-                    ia.start()
-                        #3
-                    ia.stop()
-                
-                经测试, while loop 只能写在 #1
-                若写在 #3, 则会出现多次 buffer 获取后卡死的现象
-                若写在 #2, 则会触发一个 ia 只能 start-stop 一次的 bug,
-                遇上 faulty rows 程序马上崩
+                用 while loop 套 ia 创建, 
+                抓住 TimeoutException/AccessDeniedException 后再次尝试 frame 采集
                 '''
                 while True: 
-                    print(f'cycle {i}')
-                    i+=1
                     try:
                         with h.create(0) as ia:
                             try:
-                            # time.sleep(0.1)
                                 nm = ia.remote_device.node_map
                                 nm.ExposureTime.value = arg
                                 self.ia_nodemap_dict=dict(
                                     ExposureTime = nm.ExposureTime.value,
-                                    DeviceCharacterSet = nm.DeviceCharacterSet.value,
+                                    # DeviceCharacterSet = nm.DeviceCharacterSet.value, # exists for GigE cam, but not for USB cam
                                     TriggerMode = nm.TriggerMode.value,
                                     TriggerSource = nm.TriggerSource.value,
                                 )
@@ -89,16 +74,15 @@ class ArrayFrame:
                                 with ia.fetch(timeout=3) as buffer:
                                     component = buffer.payload.components[0]
                                     imgarr = component.data.reshape(component.height, component.width)
+                                    imgarr = imgarr.copy() # essential! 上一行的 imgarr 是本 context manager 结束后会改变 imgarr 的状态, 本来有
                                 ia.stop()
-                            except TimeoutException as e: # 提供 timeout 机制, 防止卡死(真会卡死!)
+                            except TimeoutException: # 提供 timeout 机制, 防止卡死(真会卡死!)
                                 print('timeout!')
                                 continue
                     except AccessDeniedException: # 防止 ia 创建时随机的 access deny 报错 (真会连不上!)
                         print('access denied!')
                         continue
-                    faulty_rows = np.all(imgarr == 0, axis =1)
-                    if faultyrow_check_override or (faulty_rows.sum()<=10):
-                        break
+                    break
             self.imgarr=imgarr
                     
         elif isinstance(arg, str):
