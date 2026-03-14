@@ -58,7 +58,8 @@ class ArrayFrame:
                 用 while loop 套 ia 创建, 
                 抓住 TimeoutException/AccessDeniedException 后再次尝试 frame 采集
                 '''
-                while True: 
+                while True:
+                    print('acquiring frame...')
                     try:
                         with h.create(0) as ia:
                             try:
